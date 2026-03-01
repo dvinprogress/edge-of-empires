@@ -1,4 +1,4 @@
-import { Container, Graphics, Text, TextStyle } from 'pixi.js';
+import { Container, Graphics, Text, TextStyle, Rectangle } from 'pixi.js';
 import type { CityRenderData, CityState } from '@edge-of-empires/core';
 import { gridPositionToIso } from '../iso/iso-math';
 
@@ -62,9 +62,10 @@ export class CityLayer {
     indicator.circle(0, -60, 5).fill({ color: STATE_COLORS[data.state] });
     cityContainer.addChild(indicator);
 
-    // Make clickable
+    // Make clickable — hitArea explicite car les Graphics polygonaux ne detectent pas toujours les clics
     cityContainer.eventMode = 'static';
     cityContainer.cursor = 'pointer';
+    cityContainer.hitArea = new Rectangle(-35, -65, 70, 80);
     cityContainer.on('pointerdown', () => {
       this.clickHandler?.(data.id);
     });

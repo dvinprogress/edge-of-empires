@@ -101,7 +101,11 @@ export class WorldRenderer {
     this.caravanLayer?.destroy();
     this.uiOverlay?.destroy();
     this.soundManager.destroy();
-    this.app?.destroy(true);
+    if (this.app) {
+      // Retirer le canvas du DOM avant destroy pour eviter les erreurs en StrictMode
+      this.app.canvas.parentElement?.removeChild(this.app.canvas);
+      try { this.app.destroy(true); } catch { /* ignore destroy errors on unmount */ }
+    }
     this.app = null;
   }
 }

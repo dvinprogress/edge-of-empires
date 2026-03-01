@@ -11,9 +11,13 @@ interface UseRendererOptions {
 export function useRenderer({ containerId, worldState, onCityClick }: UseRendererOptions) {
   const rendererRef = useRef<WorldRenderer | null>(null);
   const initializedRef = useRef(false);
+  const onCityClickRef = useRef(onCityClick);
+  onCityClickRef.current = onCityClick;
 
+  // Initialiser le renderer UNE seule fois quand worldState est pret
   useEffect(() => {
     if (!worldState || initializedRef.current) return;
+    initializedRef.current = true;
 
     const renderer = new WorldRenderer();
     rendererRef.current = renderer;
@@ -27,8 +31,7 @@ export function useRenderer({ containerId, worldState, onCityClick }: UseRendere
       })
       .then(() => {
         renderer.renderWorld(worldState);
-        renderer.onCityClick(onCityClick);
-        initializedRef.current = true;
+        renderer.onCityClick((cityId) => onCityClickRef.current(cityId));
       });
 
     return () => {
@@ -36,7 +39,8 @@ export function useRenderer({ containerId, worldState, onCityClick }: UseRendere
       rendererRef.current = null;
       initializedRef.current = false;
     };
-  }, [containerId, worldState, onCityClick]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- init une seule fois
+  }, [containerId, worldState !== null]);
 
   const updateCityVisual = useCallback((cityId: string, state: CityState) => {
     rendererRef.current?.updateCityState(cityId, state);
