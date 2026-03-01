@@ -8,6 +8,34 @@ import { RouteLayer } from './layers/route-layer';
 import { CaravanLayer } from './layers/caravan-layer';
 import { UIOverlayLayer } from './layers/ui-overlay-layer';
 import { SoundManager } from './sound/sound-manager';
+import { loadTheme } from './theme/theme-loader';
+
+// Manifest medieval inline — evite un fetch() supplementaire au demarrage
+const MEDIEVAL_MANIFEST = {
+  id: 'medieval',
+  name: 'Medieval',
+  description: 'Theme medieval isometrique',
+  tileWidth: 128,
+  tileHeight: 64,
+  assets: {
+    terrain: {
+      'terrain-tileset': 'assets/terrain/tileset.png',
+    },
+    buildings: {
+      'building-castle':  'assets/buildings/castle.png',
+      'building-temple':  'assets/buildings/barracks.png',
+      'building-forge':   'assets/buildings/blacksmith.png',
+      'building-market':  'assets/buildings/inn.png',
+      'building-wall':    'assets/buildings/guard-tower.png',
+      'building-generic': 'assets/buildings/houses.png',
+    },
+    caravans: {
+      'caravan-default': 'assets/caravans/medieval_props_128x64_shaded_18.png',
+    },
+    sounds: {},
+    ui: {},
+  },
+} as const;
 
 export class WorldRenderer {
   private app: Application | null = null;
@@ -59,14 +87,34 @@ export class WorldRenderer {
     this.stage.addChild(this.cityLayer.container);
     this.stage.addChild(this.caravanLayer.container);
     this.stage.addChild(this.uiOverlay.container);
+
+    // Chargement des sprites du theme avant le premier rendu
+    // Le dossier themes/ est expose via app/public/themes (symlink)
+    const themePath = this.resolveThemePath(config.theme ?? 'medieval');
+    await loadTheme(MEDIEVAL_MANIFEST, themePath);
+  }
+
+  /**
+   * Resout le chemin de base du theme selon l'environnement.
+   * En dev Vite : /themes/medieval
+   * En prod (base: '/edge-of-empires/') : /edge-of-empires/themes/medieval
+   * import.meta.env est injecte par Vite au build — on y accede via unknown pour eviter
+   * les problemes de typage dans le package renderer (pas de vite/client dans ses deps).
+   */
+  private resolveThemePath(theme: string): string {
+    const metaEnv = (import.meta as unknown as { env?: { BASE_URL?: string } }).env;
+    const base = metaEnv?.BASE_URL ?? '/';
+    // Supprimer le slash final pour eviter les doubles slashes
+    const cleanBase = base.replace(/\/$/, '');
+    return `${cleanBase}/themes/${theme}`;
   }
 
   renderWorld(state: WorldState): void {
     if (!this.config) return;
     const { tileWidth, tileHeight } = this.config;
 
-    // Terrain — grille 10x10
-    this.terrainLayer?.render(10, tileWidth, tileHeight);
+    // Terrain — grille 12x12 pour couvrir l'ecran
+    this.terrainLayer?.render(12, tileWidth, tileHeight);
 
     // Routes
     this.routeLayer?.renderRoutes(state.routes);
@@ -77,7 +125,7 @@ export class WorldRenderer {
     }
 
     // Centrer la camera sur le milieu de la grille
-    const center = gridPositionToIso({ col: 4, row: 4 }, tileWidth, tileHeight);
+    const center = gridPositionToIso({ col: 5, row: 5 }, tileWidth, tileHeight);
     this.camera?.centerOn(center.x, center.y);
   }
 

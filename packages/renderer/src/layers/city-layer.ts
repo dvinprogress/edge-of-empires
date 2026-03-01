@@ -1,4 +1,4 @@
-import { Container, Graphics, Text, TextStyle, Rectangle } from 'pixi.js';
+import { Container, Sprite, Graphics, Text, TextStyle, Rectangle, Assets, Texture } from 'pixi.js';
 import type { CityRenderData, CityState } from '@edge-of-empires/core';
 import { gridPositionToIso } from '../iso/iso-math';
 
@@ -8,6 +8,15 @@ const STATE_COLORS: Record<CityState, number> = {
   success: 0x2ecc71,
   error: 0xe74c3c,
   offline: 0x555555,
+};
+
+// Teinte appliquee au sprite selon l'etat (blanc = aucune teinte)
+const STATE_TINTS: Record<CityState, number> = {
+  idle: 0xffffff,
+  building: 0xffe88a,
+  success: 0x90ffb0,
+  error: 0xff9090,
+  offline: 0x888888,
 };
 
 const LABEL_STYLE = new TextStyle({
@@ -21,11 +30,24 @@ const LABEL_STYLE = new TextStyle({
   },
 });
 
+// Correspondance icone → alias texture + largeur d'affichage ciblee (en px)
+const ICON_TO_TEXTURE: Record<string, { alias: string; displayWidth: number }> = {
+  castle: { alias: 'building-castle', displayWidth: 160 },
+  temple: { alias: 'building-temple', displayWidth: 130 },
+  forge:  { alias: 'building-forge',  displayWidth: 130 },
+  market: { alias: 'building-market', displayWidth: 110 },
+  wall:   { alias: 'building-wall',   displayWidth: 120 },
+};
+
+const DEFAULT_TEXTURE = { alias: 'building-generic', displayWidth: 100 };
+
 export class CityLayer {
   readonly container = new Container();
   private cityContainers = new Map<string, Container>();
+  private citySprites = new Map<string, Sprite>();
   private cityGraphics = new Map<string, Graphics>();
   private cityIcons = new Map<string, string>();
+  private cityLabelOffsets = new Map<string, number>();
   private clickHandler?: (cityId: string) => void;
   private tileW = 128;
   private tileH = 64;
@@ -47,42 +69,92 @@ export class CityLayer {
     cityContainer.y = iso.y;
     cityContainer.zIndex = data.position.row * 10 + data.position.col;
 
-    const building = new Graphics();
     const icon = data.plugin.meta.icon;
-    this.drawBuildingByType(building, icon, STATE_COLORS[data.state]);
-    cityContainer.addChild(building);
+    const texInfo = ICON_TO_TEXTURE[icon] ?? DEFAULT_TEXTURE;
 
-    // City name label
+    let usedSprite = false;
+    let labelYOffset = -85; // position du label par defaut (mode Graphics)
+
+    try {
+      const texture = Assets.get(texInfo.alias) as Texture | undefined;
+      if (texture) {
+        const sprite = new Sprite(texture);
+        // Ancre en bas au centre — le batiment pose sur la tuile
+        sprite.anchor.set(0.5, 1.0);
+        const scale = texInfo.displayWidth / texture.width;
+        sprite.scale.set(scale);
+        // Leger decalage vers le bas pour poser le batiment sur la tuile
+        sprite.y = 10;
+        sprite.tint = STATE_TINTS[data.state];
+        cityContainer.addChild(sprite);
+        this.citySprites.set(data.id, sprite);
+        // Le label se place au-dessus de la hauteur totale du sprite
+        labelYOffset = -(sprite.height - 10) - 8;
+        usedSprite = true;
+      }
+    } catch {
+      // Texture non disponible — fallback Graphics
+    }
+
+    if (!usedSprite) {
+      const building = new Graphics();
+      this.drawBuildingFallback(building, icon, STATE_COLORS[data.state]);
+      cityContainer.addChild(building);
+      this.cityGraphics.set(data.id, building);
+    }
+
+    // Label du nom de la ville
     const label = new Text({ text: data.name, style: LABEL_STYLE });
     label.anchor.set(0.5, 1);
-    label.y = -85;
+    label.y = labelYOffset;
     cityContainer.addChild(label);
+    this.cityLabelOffsets.set(data.id, labelYOffset);
 
-    // State indicator dot
+    // Indicateur d'etat (petit point colore)
     const indicator = new Graphics();
-    indicator.circle(0, -95, 5).fill({ color: STATE_COLORS[data.state] });
+    indicator.circle(0, labelYOffset - 12, 5).fill({ color: STATE_COLORS[data.state] });
     cityContainer.addChild(indicator);
 
-    // Make clickable — hitArea explicite car les Graphics polygonaux ne detectent pas toujours les clics
+    // Zone de clic explicite couvrant le batiment
     cityContainer.eventMode = 'static';
     cityContainer.cursor = 'pointer';
-    cityContainer.hitArea = new Rectangle(-40, -90, 80, 100);
+    const hitW = usedSprite ? texInfo.displayWidth + 20 : 80;
+    const hitH = usedSprite ? Math.abs(labelYOffset) + 30 : 100;
+    cityContainer.hitArea = new Rectangle(-hitW / 2, -hitH, hitW, hitH + 20);
     cityContainer.on('pointerdown', () => {
       this.clickHandler?.(data.id);
     });
 
     this.container.addChild(cityContainer);
     this.cityContainers.set(data.id, cityContainer);
-    this.cityGraphics.set(data.id, building);
     this.cityIcons.set(data.id, icon);
   }
 
   updateCityState(cityId: string, newState: CityState): void {
+    // Mise a jour du sprite si disponible
+    const sprite = this.citySprites.get(cityId);
+    if (sprite) {
+      sprite.tint = STATE_TINTS[newState];
+    }
+
+    // Mise a jour du Graphics fallback si utilise
     const building = this.cityGraphics.get(cityId);
-    if (!building) return;
     const icon = this.cityIcons.get(cityId) ?? 'generic';
-    building.clear();
-    this.drawBuildingByType(building, icon, STATE_COLORS[newState]);
+    if (building) {
+      building.clear();
+      this.drawBuildingFallback(building, icon, STATE_COLORS[newState]);
+    }
+
+    // Mise a jour du point indicateur
+    const cityContainer = this.cityContainers.get(cityId);
+    if (cityContainer) {
+      const lastChild = cityContainer.children[cityContainer.children.length - 1];
+      if (lastChild instanceof Graphics) {
+        lastChild.clear();
+        const labelY = this.cityLabelOffsets.get(cityId) ?? -85;
+        lastChild.circle(0, labelY - 12, 5).fill({ color: STATE_COLORS[newState] });
+      }
+    }
   }
 
   getCityIsoPosition(cityId: string): { x: number; y: number } | undefined {
@@ -95,66 +167,43 @@ export class CityLayer {
     this.clickHandler = handler;
   }
 
-  private drawBuildingByType(g: Graphics, icon: string, color: number): void {
+  /** Batiment generique en Graphics — fallback quand la texture est absente */
+  private drawBuildingFallback(g: Graphics, icon: string, color: number): void {
     switch (icon) {
       case 'castle': this.drawCastle(g, color); break;
       case 'temple': this.drawTemple(g, color); break;
-      case 'forge': this.drawForge(g, color); break;
+      case 'forge':  this.drawForge(g, color);  break;
       case 'market': this.drawMarket(g, color); break;
-      case 'wall': this.drawWall(g, color); break;
-      default: this.drawGenericBuilding(g, color); break;
+      case 'wall':   this.drawWall(g, color);   break;
+      default:       this.drawGenericBuilding(g, color); break;
     }
   }
 
-  /** Castle — tour carree avec creneaux (local-machine) */
   private drawCastle(g: Graphics, color: number): void {
     const light = Math.min(color + 0x222222, 0xffffff);
     const dark = Math.max(color - 0x222222, 0x000000);
-
-    // Base isometrique large
     g.poly([{ x: 0, y: -20 }, { x: 40, y: 0 }, { x: 0, y: 20 }, { x: -40, y: 0 }]).fill({ color, alpha: 0.9 });
-
-    // Face droite (claire)
     g.poly([{ x: 0, y: -65 }, { x: 40, y: -45 }, { x: 40, y: 0 }, { x: 0, y: -20 }]).fill({ color: light, alpha: 0.9 });
-
-    // Face gauche (sombre)
     g.poly([{ x: 0, y: -65 }, { x: -40, y: -45 }, { x: -40, y: 0 }, { x: 0, y: -20 }]).fill({ color: dark, alpha: 0.9 });
-
-    // Creneaux droite — 3 blocs en haut de la face droite
     for (let i = 0; i < 3; i++) {
       const bx = 10 + i * 12;
       g.poly([{ x: bx, y: -65 }, { x: bx + 8, y: -60 }, { x: bx + 8, y: -72 }, { x: bx, y: -77 }]).fill({ color: light });
     }
-
-    // Creneaux gauche
     for (let i = 0; i < 3; i++) {
       const bx = -10 - i * 12;
       g.poly([{ x: bx, y: -65 }, { x: bx - 8, y: -60 }, { x: bx - 8, y: -72 }, { x: bx, y: -77 }]).fill({ color: dark });
     }
-
-    // Drapeau au sommet
     g.moveTo(0, -65).lineTo(0, -80).stroke({ color: 0x333333, width: 1.5 });
     g.poly([{ x: 0, y: -80 }, { x: 12, y: -75 }, { x: 0, y: -70 }]).fill({ color: 0xcc2222 });
   }
 
-  /** Temple — colonnes + fronton triangulaire (github) */
   private drawTemple(g: Graphics, color: number): void {
     const light = Math.min(color + 0x222222, 0xffffff);
     const dark = Math.max(color - 0x222222, 0x000000);
-
-    // Base isometrique
     g.poly([{ x: 0, y: -10 }, { x: 40, y: 10 }, { x: 0, y: 30 }, { x: -40, y: 10 }]).fill({ color, alpha: 0.9 });
-
-    // Corps droite
     g.poly([{ x: 0, y: -55 }, { x: 40, y: -35 }, { x: 40, y: 10 }, { x: 0, y: -10 }]).fill({ color: light, alpha: 0.88 });
-
-    // Corps gauche
     g.poly([{ x: 0, y: -55 }, { x: -40, y: -35 }, { x: -40, y: 10 }, { x: 0, y: -10 }]).fill({ color: dark, alpha: 0.88 });
-
-    // Fronton triangulaire (toit)
     g.poly([{ x: 0, y: -75 }, { x: 40, y: -55 }, { x: -40, y: -55 }]).fill({ color: light, alpha: 0.95 });
-
-    // 4 colonnes sur la face droite
     for (let i = 0; i < 4; i++) {
       const cx = 8 + i * 8;
       g.rect(cx - 2, -50, 3, 40).fill({ color: 0xf0e0b0 });
@@ -162,69 +211,38 @@ export class CityLayer {
     }
   }
 
-  /** Forge — batiment avec cheminee fumante (vercel) */
   private drawForge(g: Graphics, color: number): void {
     const light = Math.min(color + 0x222222, 0xffffff);
     const dark = Math.max(color - 0x222222, 0x000000);
-
-    // Base
     g.poly([{ x: 0, y: -15 }, { x: 38, y: 4 }, { x: 0, y: 23 }, { x: -38, y: 4 }]).fill({ color, alpha: 0.9 });
-
-    // Toit incline droite
     g.poly([{ x: 0, y: -55 }, { x: 38, y: -35 }, { x: 38, y: 4 }, { x: 0, y: -15 }]).fill({ color: light, alpha: 0.88 });
-
-    // Toit incline gauche
     g.poly([{ x: 0, y: -65 }, { x: -38, y: -40 }, { x: -38, y: 4 }, { x: 0, y: -15 }]).fill({ color: dark, alpha: 0.88 });
-
-    // Cheminee
     g.rect(-22, -80, 10, 30).fill({ color: Math.max(color - 0x333333, 0x000000) });
     g.rect(-24, -82, 14, 5).fill({ color: dark });
-
-    // Fumee (3 cercles de taille croissante)
     g.circle(-17, -92, 4).fill({ color: 0xaaaaaa, alpha: 0.6 });
     g.circle(-12, -102, 5).fill({ color: 0xbbbbbb, alpha: 0.45 });
     g.circle(-7, -114, 6).fill({ color: 0xcccccc, alpha: 0.3 });
   }
 
-  /** Market — etals avec auvents en tissu (supabase) */
   private drawMarket(g: Graphics, color: number): void {
     const light = Math.min(color + 0x222222, 0xffffff);
     const dark = Math.max(color - 0x222222, 0x000000);
-
-    // Base large
     g.poly([{ x: 0, y: -10 }, { x: 45, y: 12 }, { x: 0, y: 34 }, { x: -45, y: 12 }]).fill({ color, alpha: 0.9 });
-
-    // Corps droite bas
     g.poly([{ x: 0, y: -45 }, { x: 45, y: -22 }, { x: 45, y: 12 }, { x: 0, y: -10 }]).fill({ color: light, alpha: 0.85 });
-
-    // Corps gauche bas
     g.poly([{ x: 0, y: -45 }, { x: -45, y: -22 }, { x: -45, y: 12 }, { x: 0, y: -10 }]).fill({ color: dark, alpha: 0.85 });
-
-    // Auvent droit (tente triangulaire)
     g.poly([{ x: 0, y: -60 }, { x: 38, y: -38 }, { x: 12, y: -32 }]).fill({ color: 0xdd6633, alpha: 0.9 });
     g.poly([{ x: 0, y: -60 }, { x: 38, y: -38 }, { x: 38, y: -42 }, { x: 0, y: -65 }]).fill({ color: 0xcc4422, alpha: 0.9 });
-
-    // Auvent gauche
     g.poly([{ x: 0, y: -60 }, { x: -38, y: -38 }, { x: -12, y: -32 }]).fill({ color: 0x33aadd, alpha: 0.9 });
     g.poly([{ x: 0, y: -60 }, { x: -38, y: -38 }, { x: -38, y: -42 }, { x: 0, y: -65 }]).fill({ color: 0x2288bb, alpha: 0.9 });
-
-    // Caisses au sol (petits carres)
     g.rect(10, 5, 8, 6).fill({ color: 0x8b6914 });
     g.rect(-20, 8, 8, 6).fill({ color: 0x7a5c10 });
   }
 
-  /** Wall — muraille avec tour ronde (cloudflare) */
   private drawWall(g: Graphics, color: number): void {
     const light = Math.min(color + 0x222222, 0xffffff);
     const dark = Math.max(color - 0x222222, 0x000000);
-
-    // Section de muraille (base longue et basse)
     g.poly([{ x: -45, y: 5 }, { x: 45, y: -15 }, { x: 45, y: 15 }, { x: -45, y: 35 }]).fill({ color, alpha: 0.9 });
-
-    // Face superieure muraille
     g.poly([{ x: -45, y: -20 }, { x: 45, y: -40 }, { x: 45, y: -15 }, { x: -45, y: 5 }]).fill({ color: light, alpha: 0.85 });
-
-    // Creneaux sur la muraille (4 blocs)
     for (let i = 0; i < 4; i++) {
       const cx = -32 + i * 18;
       g.poly([
@@ -232,15 +250,9 @@ export class CityLayer {
         { x: cx + 10, y: -35 - i * 0.5 }, { x: cx, y: -31 - i * 0.5 },
       ]).fill({ color: light });
     }
-
-    // Tour ronde a droite
     g.circle(38, -30, 14).fill({ color: dark, alpha: 0.95 });
     g.circle(38, -30, 14).stroke({ color: Math.max(color - 0x111111, 0), width: 2 });
-
-    // Sommet de la tour
     g.circle(38, -45, 14).fill({ color: light, alpha: 0.9 });
-
-    // Creneaux de la tour
     for (let i = 0; i < 4; i++) {
       const angle = (i / 4) * Math.PI * 2;
       const tx = 38 + Math.cos(angle) * 10;
@@ -249,11 +261,9 @@ export class CityLayer {
     }
   }
 
-  /** Generic — fallback si l'icone est inconnu */
   private drawGenericBuilding(g: Graphics, color: number): void {
     const light = Math.min(color + 0x222222, 0xffffff);
     const dark = Math.max(color - 0x222222, 0x000000);
-
     g.poly([{ x: 0, y: -20 }, { x: 35, y: -2 }, { x: 0, y: 16 }, { x: -35, y: -2 }]).fill({ color, alpha: 0.9 });
     g.poly([{ x: 0, y: -60 }, { x: 35, y: -42 }, { x: 35, y: -2 }, { x: 0, y: -20 }]).fill({ color: light, alpha: 0.85 });
     g.poly([{ x: 0, y: -60 }, { x: -35, y: -42 }, { x: -35, y: -2 }, { x: 0, y: -20 }]).fill({ color: dark, alpha: 0.85 });
