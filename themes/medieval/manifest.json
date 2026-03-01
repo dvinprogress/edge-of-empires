@@ -1,13 +1,24 @@
 {
   "id": "medieval",
   "name": "Medieval",
-  "description": "Theme medieval inspire de 0 A.D. — https://play0ad.com — CC BY-SA",
+  "description": "Theme medieval isometrique — sprites FeudalWars (CC0) + Yar (CC-BY 3.0) + rubberduck (CC0)",
   "tileWidth": 128,
   "tileHeight": 64,
   "assets": {
-    "terrain": {},
-    "buildings": {},
-    "caravans": {},
+    "terrain": {
+      "terrain-tileset": "assets/terrain/tileset.png"
+    },
+    "buildings": {
+      "building-castle": "assets/buildings/castle.png",
+      "building-temple": "assets/buildings/barracks.png",
+      "building-forge": "assets/buildings/blacksmith.png",
+      "building-market": "assets/buildings/inn.png",
+      "building-wall": "assets/buildings/guard-tower.png",
+      "building-generic": "assets/buildings/houses.png"
+    },
+    "caravans": {
+      "caravan-default": "assets/caravans/medieval_props_128x64_shaded_18.png"
+    },
     "sounds": {
       "ambient": "assets/sounds/ambient.ogg",
       "construction": "assets/sounds/construction.ogg",
