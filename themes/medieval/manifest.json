@@ -1,0 +1,14 @@
+{
+  "id": "medieval",
+  "name": "Medieval",
+  "description": "Theme medieval inspire de 0 A.D.",
+  "tileWidth": 128,
+  "tileHeight": 64,
+  "assets": {
+    "terrain": {},
+    "buildings": {},
+    "caravans": {},
+    "sounds": {},
+    "ui": {}
+  }
+}

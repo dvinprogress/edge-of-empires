@@ -1,0 +1,14 @@
+{
+  "name": "edge-of-empires",
+  "private": true,
+  "scripts": {
+    "dev": "pnpm --filter app dev",
+    "build": "pnpm -r build",
+    "build:core": "pnpm --filter @edge-of-empires/core build",
+    "build:renderer": "pnpm --filter @edge-of-empires/renderer build",
+    "build:app": "pnpm --filter app build"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
