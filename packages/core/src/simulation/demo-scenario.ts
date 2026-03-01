@@ -1,6 +1,6 @@
 import type { SimulationScenario } from '../types';
 
-/** Scenario complet de deploiement — combine tous les plugins dans l'ordre */
+/** Scenario complet de deploiement — adapte a une stack Next.js + Supabase + Vercel + GitHub */
 export const fullDeploymentScenario: SimulationScenario = {
   name: 'full-deployment',
   description: 'Simulation complete : du code au deploiement en passant par la CI',
@@ -23,7 +23,7 @@ export const fullDeploymentScenario: SimulationScenario = {
         targetCity: 'github',
         type: 'terminal.command',
         routeType: 'code',
-        humanMessage: '⚡ Un messager part de La Citadelle vers La Bibliotheque',
+        humanMessage: '⚡ Un messager part de La Citadelle vers Les Archives',
       },
       cityStateChange: { cityId: 'local-machine', newState: 'success' },
     },
@@ -33,7 +33,7 @@ export const fullDeploymentScenario: SimulationScenario = {
       event: {
         sourceCity: 'github',
         type: 'git.push',
-        humanMessage: '📜 De nouveaux parchemins arrivent a La Bibliotheque',
+        humanMessage: '📜 De nouveaux parchemins arrivent aux Archives',
       },
       cityStateChange: { cityId: 'github', newState: 'building' },
     },
@@ -43,10 +43,10 @@ export const fullDeploymentScenario: SimulationScenario = {
       event: {
         sourceCity: 'github',
         type: 'ci.started',
-        humanMessage: '🔍 Les scribes de La Bibliotheque verifient les parchemins...',
+        humanMessage: '🔍 Les scribes des Archives verifient les parchemins...',
       },
     },
-    // 5. CI passe
+    // 5. CI passe → deploiement
     {
       delay: 3000,
       event: {
@@ -54,7 +54,7 @@ export const fullDeploymentScenario: SimulationScenario = {
         targetCity: 'vercel',
         type: 'ci.passed',
         routeType: 'deployment',
-        humanMessage: '✨ Les scribes de La Bibliotheque ont valide les parchemins !',
+        humanMessage: '✨ Les scribes des Archives ont valide les parchemins !',
       },
       cityStateChange: { cityId: 'github', newState: 'success' },
     },
@@ -64,7 +64,7 @@ export const fullDeploymentScenario: SimulationScenario = {
       event: {
         sourceCity: 'vercel',
         type: 'deployment.started',
-        humanMessage: "🏗️ L'Atelier commence a construire une nouvelle version",
+        humanMessage: '🏗️ La Forge commence a construire une nouvelle version',
       },
       cityStateChange: { cityId: 'vercel', newState: 'building' },
     },
@@ -73,8 +73,10 @@ export const fullDeploymentScenario: SimulationScenario = {
       delay: 6000,
       event: {
         sourceCity: 'vercel',
+        targetCity: 'supabase',
         type: 'deployment.succeeded',
-        humanMessage: "🎉 L'Atelier a termine ! La nouvelle version est en ligne",
+        routeType: 'data',
+        humanMessage: '🎉 La Forge a termine ! La nouvelle version est en ligne',
       },
       cityStateChange: { cityId: 'vercel', newState: 'success' },
     },
@@ -84,28 +86,19 @@ export const fullDeploymentScenario: SimulationScenario = {
       event: {
         sourceCity: 'supabase',
         type: 'query.executed',
-        humanMessage: '📊 Les marchands du Marche echangent des ressources',
+        humanMessage: '📊 Les marchands du Grand Marche echangent des ressources',
       },
       cityStateChange: { cityId: 'supabase', newState: 'building' },
     },
+    // 9. Auth Supabase
     {
       delay: 7000,
       event: {
         sourceCity: 'supabase',
         type: 'auth.login',
-        humanMessage: '🛡️ Un voyageur presente ses lettres de passage au Marche',
+        humanMessage: '🛡️ Un voyageur presente ses lettres de passage au Grand Marche',
       },
       cityStateChange: { cityId: 'supabase', newState: 'success' },
-    },
-    // 9. Cloudflare cache
-    {
-      delay: 7500,
-      event: {
-        sourceCity: 'cloudflare',
-        type: 'cache.hit',
-        humanMessage: '⚡ Les Remparts servent un visiteur depuis leurs reserves',
-      },
-      cityStateChange: { cityId: 'cloudflare', newState: 'success' },
     },
   ],
 };
