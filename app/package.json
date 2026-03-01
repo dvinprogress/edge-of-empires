@@ -11,7 +11,12 @@
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "@edge-of-empires/core": "workspace:*",
-    "@edge-of-empires/renderer": "workspace:*"
+    "@edge-of-empires/renderer": "workspace:*",
+    "@edge-of-empires/plugin-local-machine": "workspace:*",
+    "@edge-of-empires/plugin-github": "workspace:*",
+    "@edge-of-empires/plugin-vercel": "workspace:*",
+    "@edge-of-empires/plugin-supabase": "workspace:*",
+    "@edge-of-empires/plugin-cloudflare": "workspace:*"
   },
   "devDependencies": {
     "vite": "^6.0.0",

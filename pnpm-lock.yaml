@@ -13,6 +13,21 @@ importers:
       '@edge-of-empires/core':
         specifier: workspace:*
         version: link:../packages/core
+      '@edge-of-empires/plugin-cloudflare':
+        specifier: workspace:*
+        version: link:../packages/plugins/cloudflare
+      '@edge-of-empires/plugin-github':
+        specifier: workspace:*
+        version: link:../packages/plugins/github
+      '@edge-of-empires/plugin-local-machine':
+        specifier: workspace:*
+        version: link:../packages/plugins/local-machine
+      '@edge-of-empires/plugin-supabase':
+        specifier: workspace:*
+        version: link:../packages/plugins/supabase
+      '@edge-of-empires/plugin-vercel':
+        specifier: workspace:*
+        version: link:../packages/plugins/vercel
       '@edge-of-empires/renderer':
         specifier: workspace:*
         version: link:../packages/renderer
@@ -46,6 +61,36 @@ importers:
         version: 6.4.1(jiti@2.6.1)(lightningcss@1.31.1)
 
   packages/core: {}
+
+  packages/plugins/cloudflare:
+    dependencies:
+      '@edge-of-empires/core':
+        specifier: workspace:*
+        version: link:../../core
+
+  packages/plugins/github:
+    dependencies:
+      '@edge-of-empires/core':
+        specifier: workspace:*
+        version: link:../../core
+
+  packages/plugins/local-machine:
+    dependencies:
+      '@edge-of-empires/core':
+        specifier: workspace:*
+        version: link:../../core
+
+  packages/plugins/supabase:
+    dependencies:
+      '@edge-of-empires/core':
+        specifier: workspace:*
+        version: link:../../core
+
+  packages/plugins/vercel:
+    dependencies:
+      '@edge-of-empires/core':
+        specifier: workspace:*
+        version: link:../../core
 
   packages/renderer:
     dependencies:
